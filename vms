@@ -1,0 +1,292 @@
+from tkinter import *
+from tkinter.messagebox import *
+import re
+from tkinter.scrolledtext import *
+from tkinter import simpledialog
+from sqlite3 import *
+from datetime import datetime
+
+
+
+
+root = Tk()
+root.title("Visitor Management System")
+root.geometry("900x750+50+50")
+root.config(bg="light grey")
+f = ("Times New Roman", 30, "bold")
+
+labTitle = Label(root, text="Visitor Management System", font=f, bg="blue2", fg="White", width=21)
+labTitle.place(x=200, y=10)
+
+def f1():
+	adminlog.deiconify()
+	root.withdraw()
+def f2():
+	root.deiconify()
+	adminlog.withdraw()
+def login():
+	username = "admin"
+	password = "abc123"
+	if entUser.get()==username and entPass.get()==password:
+		showinfo("Login Success", "You successfully logged in.")
+		adminview.deiconify()
+		adminlog.withdraw()
+		show_visitor()
+		entUser.delete(0, END)
+		entPass.delete(0, END)
+	else:
+		showerror("Error", "Invalid login.")
+def confirm_exit():
+	answer = askyesno("Exit Confirmation", "Are you sure you want to exit?")
+	if answer:
+		root.destroy()
+
+def show_visitor():
+    adv_stData.delete(1.0, END)
+    con = None
+    try:
+        con = connect("visitor_db.db")
+        cursor = con.cursor()
+        sql = "select * from visitors"
+        cursor.execute(sql)
+        data = cursor.fetchall()
+        info = ""
+        for d in data:
+            info += f"Name: {d[0]} \t\tPhone: {int(d[1])} \t\tIntime: {datetime.strptime(d[2], '%H:%M:%S').time()} \nVisitee: {d[3]}\n\n"
+
+        adv_stData.insert(INSERT, info)
+    except Exception as e:
+        showerror("issue", e)
+    finally:
+        if con is not None:
+            con.close()
+def f4():
+	adminlog.deiconify()
+	adminview.withdraw()
+def validate_name(name):
+	if not name:
+		return "name cannot be empty."
+	elif name.strip() == "":
+		return "Name should not be spaces."
+	elif not name.isalpha():
+		return "Invalid Name. It must contain only alphabetic characters."
+	elif len(name) < 2 or len(name) > 50:
+		return "Invalid Name length. It should be between 2 and 50 characters."
+	return None	
+
+def validate_phone(phone):
+	try:
+		phone = int(phone)
+		if phone < 0 or len(str(phone)) != 10:
+			return "Invalid Phone number. It should be a 10-digit positive number."
+	except ValueError:
+		return "Phone number must be a valid number."
+		return None
+def validate_intime():
+    intime_str = entintime.get()
+    intime_pattern = re.compile(r'^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$')
+    if not intime_pattern.match(intime_str):
+        return "Invalid time format. Please use HH:MM:SS format."
+    return None
+
+
+
+def validate_visitee(visitee):
+	if not visitee:
+		return "Visitee cannot be empty"
+	return None
+
+def validate_choices(office1, office2, office3, office4):
+	if not any([office1, office2, office3, office4]):
+		return "Please select atleast one office"
+	return None
+
+
+def save():
+    con = None
+    try:
+        con = connect("visitor_db.db")
+        cursor = con.cursor()
+        sql = "insert into visitors values(?, ?, ?, ?)"
+
+        name = entname.get()
+        validation_result = validate_name(name)
+        if validation_result:
+            showerror("Error", validation_result)
+            entname.delete(0, END)
+            entname.focus()
+            return
+
+        phone = entphone.get()
+        validation_result = validate_phone(phone)
+        if validation_result:
+            showerror("Error", validation_result)
+            entphone.delete(0, END)
+            entphone.focus()
+            return
+
+        intime = entintime.get()
+        validation_result = validate_intime()
+        if validation_result:
+            showerror("Error", validation_result)
+            entintime.delete(0, END)
+            entintime.focus()
+            return
+
+        visitee = entvisitee.get()
+        validation_result = validate_visitee(visitee)
+        if validation_result:
+            showerror("Error", validation_result)
+            entvisitee.delete(0, END)
+            entvisitee.focus()
+            return
+
+        office1_selected = office1.get()
+        office2_selected = office2.get()
+        office3_selected = office3.get()
+        office4_selected = office4.get()
+        validation_result = validate_choices(office1_selected, office2_selected, office3_selected, office4_selected)
+        if validation_result:
+            showerror("Error", validation_result)
+            return
+
+        cursor.execute(sql, (name, phone, intime, visitee))
+        con.commit()
+        showinfo("ADDED")
+        entname.delete(0, END)
+        entphone.delete(0, END)
+        entintime.delete(0, END)
+        entvisitee.delete(0, END)
+        office1.set(0)
+        office2.set(0)
+        office3.set(0)
+        office4.set(0)
+        entname.focus()
+    except Exception as e:
+        con.rollback()
+        showerror("Issue", e)
+    finally:
+        if con is not None:
+            con.close()
+
+
+def delete():
+	con = None
+	try:
+		con = connect("visitor_db.db")
+		cursor = con.cursor()
+		phone = simpledialog.askstring("Input", "Enter phone number to delete:")
+		if phone:
+			confirmation = askyesno("Confirm Deletion", f"Are you sure you want to delete the visitor with phone number {phone}?")
+			if confirmation:
+				sql = "delete from visitors where phone = '%s' " % phone
+				cursor.execute(sql)
+				con.commit()
+				showinfo("Success", "Visitor deleted successfully!")
+				show_visitor()
+			else:
+				showinfo("Cancelled", "Deletion cancelled.")
+		else:
+			showwarning("No Input", "Phone number cannot be empty.")
+	except Exception as e:
+		showerror("Issue", e)
+	finally:
+		if con is not None:
+			con.close()
+	
+adminlog = Toplevel(root)
+adminlog.title("Admin Login")
+adminlog.geometry("900x750+50+50")
+adminlog.config(bg="light green")
+
+labLogin = Label(adminlog, text=" Admin Login", font=f, bg="blue", width=20)
+labLogin.place(x=200, y=10)
+
+labUser = Label(adminlog, text="Username:",font=f, bg="light green")
+labUser.place(x=100, y=200)
+entUser = Entry(adminlog, font=f)
+entUser.place(x=350, y=200)
+
+labPass = Label(adminlog, text="Password:", font=f, bg="light green")
+labPass.place(x=100, y=300)
+entPass = Entry(adminlog, font=f, show="*")
+entPass.place(x=350, y=300)
+
+adminview = Toplevel(adminlog)
+adminview.title("Admin View")
+adminview.geometry("900x750+50+50")
+adminview.config(bg="light green")
+adv_stData = ScrolledText(adminview, width=85, height=20,font=("Times New Roman", 15, "bold"))
+adv_stData.place(x=20, y=10)
+adv_btnBack = Button(adminview, text="Back",font=("Times New Roman", 15, "bold"), bg="red", width=10, command=f4)
+adv_btnBack.place(x=400, y=600)
+adv_btnDel = Button(adminview, text="Delete", font=("Times New Roman", 15, "bold"), bg="RoyalBlue1", width=10,command=delete)
+adv_btnDel.place(x=400, y=500)
+
+
+btnLog = Button(adminlog, text="Login", font=("Times New Roman", 15, "bold"), bg="blue", width=10, command=login)
+btnLog.place(x=400, y=450)
+btnBack = Button(adminlog, text="Back",font=("Times New Roman", 15, "bold"), bg="red", width=10, command=f2)
+btnBack.place(x=400, y=500)
+
+labname = Label(root, text="Name:", font=("Times New Roman", 20, "bold"), bg="light grey")
+labname.place(x=150, y=100)
+entname = Entry(root, font=("Times New Roman", 20, "bold"), width=40)
+entname.place(x=250, y=100)
+
+labphone = Label(root, text="Phone Number:", font=("Times New Roman", 20, "bold"), bg="light grey")
+labphone.place(x=40, y=150)
+entphone = Entry(root, font=("Times New Roman", 20, "bold"), width=40)
+entphone.place(x=250, y=150)
+
+labintime = Label(root, text="Intime:", font=("Times New Roman", 20, "bold"), bg="light grey")
+labintime.place(x=40, y=190)
+entintime = Entry(root, font=("Times New Roman", 20, "bold"), width=40)
+entintime.place(x=250, y=190)
+
+labvisitee = Label(root, text="Visitee:", font=("Times New Roman", 20, "bold"), bg="light grey")
+labvisitee.place(x=40, y=250)
+entvisitee = Entry(root, font=("Times New Roman", 20, "bold"), width=40)
+entvisitee.place(x=250, y=250)
+
+
+laboffice = Label(root, text="Select office:", font=("Times New Roman", 20, "bold"), bg="light green")
+laboffice.place(x=70, y=300)
+office1, office2, office3, office4 = IntVar(), IntVar(), IntVar(), IntVar()
+cboffice1 = Checkbutton(root, text="Office1", font=("Times New Roman", 20, "bold"), variable=office1,bg="light green")
+cboffice2 = Checkbutton(root, text="Office2", font=("Times New Roman", 20, "bold"), variable=office2,bg="light green")
+cboffice3 = Checkbutton(root, text="Office3", font=("Times New Roman", 20, "bold"), variable=office3,bg="light green")
+cboffice4 = Checkbutton(root, text="Office4", font=("Times New Roman", 20, "bold"), variable=office4,bg="light green")
+
+cboffice1.place(x=250, y=320)
+cboffice2.place(x=250, y=370)
+cboffice3.place(x=250, y=420)
+cboffice4.place(x=250, y=470)
+
+btnSubmit = Button(root, text="Submit ", font=("Times New Roman", 15, "bold"),bg="lime green", width=10, command=save)
+btnSubmit.place(x=400, y=600)
+btnAdmin = Button(root, text="Admin Login", font=("Times New Roman", 15, "bold"), bg="yellow2", width=10, command=f1)
+btnAdmin.place(x=400, y=650)
+
+root.protocol("WM_DELETE_WINDOW", confirm_exit)
+root.mainloop()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
